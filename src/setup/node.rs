@@ -1,6 +1,7 @@
 use std::{
+    collections::HashSet,
     fs, io,
-    net::{IpAddr, SocketAddr, SocketAddrV4},
+    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4},
     path::PathBuf,
     process::{Child, Command, Stdio},
 };
@@ -12,7 +13,8 @@ use tokio::io::AsyncWriteExt;
 
 use crate::{
     setup::config::{
-        NewNodeConfig, NodeMetaData, RippledConfigFile, RIPPLED_CONFIG, RIPPLED_DIR, ZIGGURAT_DIR,
+        NewNodeConfig, NodeMetaData, RippledConfigFile, DEFAULT_PORT, RIPPLED_CONFIG, RIPPLED_DIR,
+        ZIGGURAT_DIR,
     },
     tools::constants::{CONNECTION_TIMEOUT, JSON_RPC_PORT, NODE_STATE_DIR, STATEFUL_IP},
 };
@@ -272,5 +274,132 @@ impl NodeBuilder {
         };
         node.start_process().await?;
         Ok(node)
+    }
+}
+/////////////////////////////////////////
+pub struct NodeBuilder2 {
+    dir: TempDir,
+    conf: Node2Conf,
+    meta: NodeMetaData,
+}
+
+impl NodeBuilder2 {
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let dir = TempDir::new()?;
+        let mut copy_options = CopyOptions::new();
+        copy_options.content_only = true;
+        copy(&path, &dir, &copy_options)?;
+        let conf = Node2Conf::new(dir.path().to_path_buf());
+        let meta = NodeMetaData::new(conf.path.clone())?;
+
+        Ok(Self { dir, conf, meta })
+    }
+
+    pub async fn start(self, log_to_stdout: bool) -> Result<Node2> {
+        let content = RippledConfigFile::generate2(&self.conf)?;
+        let path = self.conf.path.join(RIPPLED_CONFIG);
+        fs::write(path, content)?;
+
+        Ok(Node2::start(
+            self.dir,
+            &self.meta,
+            log_to_stdout,
+            self.conf.local_addr,
+        ))
+    }
+
+    pub fn add_args(mut self, args: Vec<String>) -> Self {
+        for arg in args {
+            self.meta.start_args.push(arg.into());
+        }
+        self
+    }
+
+    /// Sets initial peers for the node.
+    pub fn initial_peers(mut self, addrs: Vec<SocketAddr>) -> Self {
+        self.conf.initial_peers = addrs.into_iter().collect();
+        self
+    }
+
+    /// Sets validator token to be placed in rippled.cfg.
+    /// This will configure the node to run as a validator.
+    pub fn validator_token(mut self, token: String) -> Self {
+        self.conf.validator_token = Some(token);
+        self
+    }
+
+    /// Sets network's id to form an isolated testnet.
+    pub fn network_id(mut self, network_id: u32) -> Self {
+        self.conf.network_id = Some(network_id);
+        self
+    }
+}
+
+/// Fields to be written to the node's configuration file.
+#[derive(Debug)]
+pub struct Node2Conf {
+    /// The path of the cache directory of the node.
+    pub path: PathBuf,
+    /// The socket address of the node.
+    pub local_addr: SocketAddr,
+    /// The initial peer set of the node.
+    pub initial_peers: HashSet<SocketAddr>,
+    /// The initial max number of peer connections to allow.
+    pub max_peers: usize,
+    /// Token when run as a validator.
+    pub validator_token: Option<String>,
+    /// Network's id to form an isolated testnet.
+    pub network_id: Option<u32>,
+}
+
+impl Node2Conf {
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            path,
+            local_addr: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, DEFAULT_PORT)),
+            initial_peers: Default::default(),
+            max_peers: 0,
+            validator_token: None,
+            network_id: None,
+        }
+    }
+}
+
+pub struct Node2 {
+    child: Child,
+    dir: TempDir,
+    addr: SocketAddr,
+}
+
+impl Node2 {
+    pub fn start(
+        dir: TempDir,
+        meta: &NodeMetaData,
+        log_to_stdout: bool,
+        addr: SocketAddr,
+    ) -> Node2 {
+        let (stdout, stderr) = match log_to_stdout {
+            true => (Stdio::inherit(), Stdio::inherit()),
+            false => (Stdio::null(), Stdio::null()),
+        };
+        let child = Command::new(&meta.start_command)
+            .current_dir(&meta.path)
+            .args(&meta.start_args)
+            .stdin(Stdio::null())
+            .stdout(stdout)
+            .stderr(stderr)
+            .spawn()
+            .expect("node failed to start");
+        Node2 { child, dir, addr }
+    }
+
+    pub fn stop(self) -> Result<()> {
+        stop_child(self.child)?;
+        self.dir.close()?;
+        Ok(())
+    }
+
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
     }
 }

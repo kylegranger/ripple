@@ -45,3 +45,4 @@ Follow the steps below to save an initial state that can be loaded later for oth
    ```
 5. Copy the node's files to directory referenced by constant `pub const NODE_STATE_DIR`, currently: `cp -a ~/.ziggurat/testnet/1 ~/.ziggurat/ripple_stateful`
 6. Now you can stop the test started in step 1.
+7. Remove config file, it will be created when starting new node: `rm ~/.ziggurat/ripple_stateful/rippled.cfg`
