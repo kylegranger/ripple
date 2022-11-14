@@ -36,7 +36,7 @@ pub struct Header {
     payload_wire_size: u32,
     #[allow(dead_code)]
     uncompressed_size: u32,
-    message_type: u16,
+    pub message_type: u16,
     #[allow(dead_code)]
     compression: Compression,
 }

@@ -1,9 +1,18 @@
+use std::time::Duration;
+
 use secp256k1::constants::PUBLIC_KEY_SIZE;
 use serde::Deserialize;
+use tempfile::TempDir;
+use tokio::time::sleep;
 
 use crate::{
-    protocol::codecs::binary::{BinaryMessage, Payload},
+    protocol::{
+        codecs::binary::{BinaryMessage, Payload},
+        proto::TmValidatorList,
+    },
+    setup::node::{Node, NodeType},
     tests::conformance::{perform_expected_message_test, PUBLIC_KEY_TYPES},
+    tools::{config::TestConfig, synth_node::SyntheticNode},
 };
 
 #[derive(Deserialize)]
@@ -54,4 +63,45 @@ async fn c015_TM_VALIDATOR_LIST_COLLECTION_node_should_send_validator_list() {
         false
     };
     perform_expected_message_test(Default::default(), &check).await;
+}
+
+// #[tokio::test]
+async fn c026() {
+    // Create stateful node.
+    let target = TempDir::new().expect("unable to create TempDir");
+    let mut node = Node::builder()
+        .log_to_stdout(true)
+        .start(target.path(), NodeType::Stateless)
+        .await
+        .expect("unable to start stateful node");
+
+    let mut test_config = TestConfig::default();
+    test_config.synth_node_config.generate_new_keys = false;
+    let mut synth_node = SyntheticNode::new(&test_config).await;
+
+    synth_node
+        .connect(node.addr())
+        .await
+        .expect("unable to connect");
+    // let example_manifest_payload = loop {
+    //     let (_, message) = synth_node.recv_message().await;
+    //     if let Payload::TmManifests(m) = message.payload {
+    //         break m;
+    //     }
+    // };
+    //
+    // let manifest = base64::encode(example_manifest_payload.list[0].stobject.clone());
+    // let payload = Payload::TmValidatorList(TmValidatorList {
+    //     manifest: manifest.as_bytes().to_vec(),
+    //     blob: vec![],
+    //     signature: vec![],
+    //     version: 1,
+    // });
+    // synth_node
+    //     .unicast(node.addr(), payload)
+    //     .expect("unable to send message");
+
+    sleep(Duration::from_secs(60)).await;
+    synth_node.shut_down().await;
+    node.stop().expect("unable to stop stateful node");
 }
