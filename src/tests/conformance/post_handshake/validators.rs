@@ -65,7 +65,7 @@ async fn c015_TM_VALIDATOR_LIST_COLLECTION_node_should_send_validator_list() {
     perform_expected_message_test(Default::default(), &check).await;
 }
 
-// #[tokio::test]
+#[tokio::test]
 async fn c026() {
     // Create stateful node.
     let target = TempDir::new().expect("unable to create TempDir");
@@ -83,25 +83,30 @@ async fn c026() {
         .connect(node.addr())
         .await
         .expect("unable to connect");
-    // let example_manifest_payload = loop {
-    //     let (_, message) = synth_node.recv_message().await;
-    //     if let Payload::TmManifests(m) = message.payload {
-    //         break m;
-    //     }
-    // };
-    //
-    // let manifest = base64::encode(example_manifest_payload.list[0].stobject.clone());
-    // let payload = Payload::TmValidatorList(TmValidatorList {
-    //     manifest: manifest.as_bytes().to_vec(),
-    //     blob: vec![],
-    //     signature: vec![],
-    //     version: 1,
-    // });
-    // synth_node
-    //     .unicast(node.addr(), payload)
-    //     .expect("unable to send message");
+    let example_manifest_payload = loop {
+        let (_, message) = synth_node.recv_message().await;
+        if let Payload::TmManifests(m) = message.payload {
+            break m;
+        }
+    };
 
-    sleep(Duration::from_secs(60)).await;
+    let mut st = example_manifest_payload.list[0].stobject.clone();
+    let key =
+        hex::decode("02A2C35BE0D8ADDCAA7A1995CB31C7EF6E0EC4BF471BA7481937924114CD57B983").unwrap();
+    st[7..40].clone_from_slice(key.as_slice());
+    let manifest = base64::encode(st);
+    let mb = manifest.as_bytes().to_vec();
+    let payload = Payload::TmValidatorList(TmValidatorList {
+        manifest: mb,
+        blob: vec![],
+        signature: vec![],
+        version: 1,
+    });
+    synth_node
+        .unicast(node.addr(), payload)
+        .expect("unable to send message");
+
+    sleep(Duration::from_secs(30)).await;
     synth_node.shut_down().await;
     node.stop().expect("unable to stop stateful node");
 }

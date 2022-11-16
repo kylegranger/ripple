@@ -18,7 +18,6 @@ impl Reading for InnerNode {
     }
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
-        // println!("Message: {}", message.header.message_type);
         info!(parent: self.node().span(), "read a message from {}: {:?}", source, message.payload);
         debug!(
             parent: self.node().span(),
