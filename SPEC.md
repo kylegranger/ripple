@@ -312,3 +312,10 @@ The test index makes use of symbolic language in describing connection and messa
     The node should be able to accept connections after such a request.
     This test attempts a handshake with a long 'User-Agent' header and ensures that the connection
     is rejected. Then, it attempts a normal connection and ensures that the connection is established.
+
+### ZG-RESISTANCE-002
+
+    The node terminates a handshake when the 'Server' header from the responder is too long (8192 bytes in this test).
+    The node should be able to connect to other peers present in its config file.
+    This test attempts a handshake with a long 'Server' header and ensures that the connection
+    is rejected. Then, it continues usual handshake to other peers and ensures that this connection is established.
