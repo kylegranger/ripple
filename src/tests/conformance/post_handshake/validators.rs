@@ -35,10 +35,12 @@ async fn c015_TM_VALIDATOR_LIST_COLLECTION_node_should_send_validator_list() {
     let check = |m: &BinaryMessage| {
         if let Payload::TmValidatorListCollection(validator_list_collection) = &m.payload {
             if let Some(blob_info) = validator_list_collection.blobs.first() {
+                println!("Blob bytes: {:?}", blob_info.blob);
                 let decoded_blob =
                     base64::decode(&blob_info.blob).expect("unable to decode a blob");
                 let text = String::from_utf8(decoded_blob)
                     .expect("unable to convert decoded blob bytes to a string");
+                println!("json blob: {}", text);
                 let validator_list = serde_json::from_str::<ValidatorList>(&text)
                     .expect("unable to deserialize a validator list");
                 if validator_list.validators.is_empty() {
@@ -96,17 +98,17 @@ async fn c026() {
     st[7..40].clone_from_slice(key.as_slice());
     let manifest = base64::encode(st);
     let mb = manifest.as_bytes().to_vec();
-    let payload = Payload::TmValidatorList(TmValidatorList {
+    let _payload = Payload::TmValidatorList(TmValidatorList {
         manifest: mb,
         blob: vec![],
         signature: vec![],
         version: 1,
     });
-    synth_node
-        .unicast(node.addr(), payload)
-        .expect("unable to send message");
+    // synth_node
+    //     .unicast(node.addr(), payload)
+    //     .expect("unable to send message");
 
-    sleep(Duration::from_secs(30)).await;
+    sleep(Duration::from_secs(300)).await;
     synth_node.shut_down().await;
     node.stop().expect("unable to stop stateful node");
 }
