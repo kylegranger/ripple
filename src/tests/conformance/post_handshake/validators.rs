@@ -4,7 +4,7 @@ use tempfile::TempDir;
 use tokio::time::sleep;
 // use sha2::Sha512;
 // use hex_literal::hex;
-use sha2::{Sha512_256, Digest};
+use sha2::{Sha512, Digest};
 
 use secp256k1::{
     constants::{PUBLIC_KEY_SIZE},
@@ -206,17 +206,26 @@ async fn c015_TM_VALIDATOR_LIST_COLLECTION_node_should_send_validator_list() {
 
 fn create_sha512_half_digest(buffer: &Vec<u8>) -> [u8; 32]{
 
-    let mut hasher = Sha512_256::new();
+    // let mut tempo = Sha512::new();
+    // tempo.update(buffer);
+    // let temp = tempo.finalize();
+    // let mut s = [0u8; 64];
+    // for i in 0..64 {
+    //     s[i] = temp[i];
+    // }
+    // println!("rust: xxx digest 512 dump: {:02X?}", s);
+
+
+    let mut hasher = Sha512::new();
     hasher.update(buffer);
     let result = hasher.finalize();
 
+    // only use first 32 bytes of 64-byte result
     let mut signature = [0u8; 32];
     for i in 0..32 {
         signature[i] = result[i];
     }
 
-    // let digest = result.clone().as_slice().clone();
-    //println!("digest dump: {:02X?}", digest);
     signature
 }
 
@@ -590,39 +599,52 @@ async fn c026() {
     let master_signature = s.serialize_der();
     let master_signature_b64 = base64::encode(master_signature);
     let master_signature_bytes = base64::decode(master_signature_b64).expect("unable to decode a blob");
-    println!("rust: sig a size: {:02X?}", master_signature_bytes.len());
+    println!("rust: master_signature size: {}", master_signature_bytes.len());
+    println!("rust: master_signature: {:02X?}", master_signature_bytes);
+
 
     //
-    // 5. Create manifest B with sequence, public key, signing public key, master signature
+    // 5. Sign it with signing private key, get signature
     //
-    let manifest_b = create_manifest_b(&master_public_bytes, &signing_public_bytes, &master_signature_bytes);
-    println!("rust: manifest_b size: {}", manifest_b.len());
-    println!("rust: manifest_b dump: {:02X?}", manifest_b);
-
-    //
-    // 6. append manifest prefix
-    //
-    let mut size = 4 + manifest_b.len();
-    let mut prefix_manifest_b: Vec<u8> = vec!(0; manifest_b.len() + 4);
-    prefix_manifest_b[0..4].clone_from_slice(man_prefix.as_slice());
-    prefix_manifest_b[4..4+manifest_b.len()].clone_from_slice(manifest_b.clone().as_slice());
-    println!("rust: prefix_manifest_b size: {}", prefix_manifest_b.len());
-    println!("rust: prefix_manifest_b dump: {:02X?}", prefix_manifest_b);
-
-    //
-    // 7. Create digest, sign it with signing private key, get signature
-    //
-    let digest_b = create_sha512_half_digest(&prefix_manifest_b);
-    println!("rust: digest_b: {:02X?}", digest_b);
-    let message_b = Message::from_slice(&digest_b).unwrap();
-    let s = engine.sign_ecdsa(&message_b, &signing_secret_key);
+    let s = engine.sign_ecdsa(&message_a, &signing_secret_key);
     let signature = s.serialize_der();
     let signature_b64 = base64::encode(signature);
     let signature_bytes = base64::decode(signature_b64).expect("unable to decode a blob");
-    println!("rust: rust: sig b size: {:02X?}", signature_bytes.len());
+    println!("rust: signature size: {}", signature_bytes.len());
+    println!("rust: signature: {:02X?}", signature_bytes);
+
+
+    // //
+    // // 5. Create manifest B with sequence, public key, signing public key, master signature
+    // //
+    // let manifest_b = create_manifest_b(&master_public_bytes, &signing_public_bytes, &master_signature_bytes);
+    // println!("rust: manifest_b size: {}", manifest_b.len());
+    // println!("rust: manifest_b dump: {:02X?}", manifest_b);
+
+    // //
+    // // 6. append manifest prefix
+    // //
+    // let mut size = 4 + manifest_b.len();
+    // let mut prefix_manifest_b: Vec<u8> = vec!(0; manifest_b.len() + 4);
+    // prefix_manifest_b[0..4].clone_from_slice(man_prefix.as_slice());
+    // prefix_manifest_b[4..4+manifest_b.len()].clone_from_slice(manifest_b.clone().as_slice());
+    // println!("rust: prefix_manifest_b size: {}", prefix_manifest_b.len());
+    // println!("rust: prefix_manifest_b dump: {:02X?}", prefix_manifest_b);
+
+    // //
+    // // 7. Create digest, sign it with signing private key, get signature
+    // //
+    // let digest_b = create_sha512_half_digest(&prefix_manifest_b);
+    // println!("rust: digest_b: {:02X?}", digest_b);
+    // let message_b = Message::from_slice(&digest_b).unwrap();
+    // let s = engine.sign_ecdsa(&message_b, &signing_secret_key);
+    // let signature = s.serialize_der();
+    // let signature_b64 = base64::encode(signature);
+    // let signature_bytes = base64::decode(signature_b64).expect("unable to decode a blob");
+    // println!("rust: rust: sig b size: {:02X?}", signature_bytes.len());
 
     //
-    // 8. Create manifest C with sequence, public key, signing public key, master signature, signature
+    // 6. Create manifest C with sequence, public key, signing public key, master signature, signature
     //
     let manifest_c = create_manifest_c(&master_public_bytes, &signing_public_bytes, &master_signature_bytes, &signature_bytes);
     println!("rust: manifest_c size: {}", manifest_c.len());
@@ -632,13 +654,15 @@ async fn c026() {
     //
     // A. Create Validator blob.
     //
-    let bstr = base64::encode(create_validator_blob_json(&manifest_a, &master_public_hex));
+    let validator_blob = create_validator_blob_json(&manifest_a, &master_public_hex);
+    let bstr = base64::encode(&validator_blob);
+    let blob_bytes = base64::decode(&bstr).expect("unable to decode a blob");
     let bb = bstr.as_bytes().to_vec();
 
     //
     // B.  Get signature for blob using master private key
     //
-    let blob_digest = create_sha512_half_digest(&bb);
+    let blob_digest = create_sha512_half_digest(&blob_bytes);
     println!("rust: blob_digest: {:02X?}", blob_digest);
     let message = Message::from_slice(&blob_digest).unwrap();
     let s = engine.sign_ecdsa(&message, &signing_secret_key);
@@ -646,11 +670,6 @@ async fn c026() {
     let blob_signature_b64 = base64::encode(blob_signature);
     let blob_signature_bytes = base64::decode(blob_signature_b64).expect("unable to decode a blob");
     println!("rust: sig c size: {:02X?}", blob_signature_bytes.len());
-
-
-
-
-
 
     let mstr = base64::encode(manifest_c);
     let mb = mstr.as_bytes().to_vec();
