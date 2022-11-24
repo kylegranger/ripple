@@ -198,6 +198,17 @@ fn create_final_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master
 }
 
 
+fn sign_buffer(secret_key: &SecretKey, buffer: &Vec<u8>) ->  Vec<u8> {
+    let engine = Secp256k1::new();
+    let digest = create_sha512_half_digest(buffer);
+    let message = Message::from_slice(&digest).unwrap();
+    let sig = engine.sign_ecdsa(&message, secret_key);
+    let sigser = sig.serialize_der();
+    let sigb64 = base64::encode(sigser);
+    let sigbytes = base64::decode(sigb64).expect("unable to decode a blob");
+    sigbytes
+}
+
 #[tokio::test]
 async fn c026() {
 
@@ -224,10 +235,7 @@ async fn c026() {
     //     }
     // };
 
-    //
     // 1. Setup keys & prefix
-    // 
-    let engine = Secp256k1::new();
     let master_secret_hex = String::from("8484781AE8EEB87D8A5AA38483B5CBBCCE6AD66B4185BB193DDDFAD5C1F4FC06");
     let master_public_hex = String::from("02ED521B8124454DD5B7769C813BD40E8D36E134DD51ACED873B49E165327F6DF2");
     let master_secret_bytes = hex::decode(&master_secret_hex).expect("unable to decode hex");
@@ -239,67 +247,35 @@ async fn c026() {
     let signing_secret_bytes = hex::decode(&signing_secret_hex).expect("unable to decode hex");
     let signing_public_bytes = hex::decode(&signing_public_hex).expect("unable to decode hex");
     let signing_secret_key = SecretKey::from_slice(signing_secret_bytes.as_slice()).expect("unable to create secret key");
-
     let man_prefix: Vec<u8> = vec!(b'M', b'A', b'N', 0);
 
-
-    //
-    // 2. Create signable manifest with sequence, public key, signing public key (without keys!)
-    //
+    // 2. Create signable manifest with sequence, public key, signing public key (without signatures)
     let signable_manifest = create_signable_manifest(&master_public_bytes, &signing_public_bytes);
 
-    //
     // 3. append manifest prefix
-    //
     let mut prefixed_signable: Vec<u8> = vec!(0; signable_manifest.len() + 4);
     prefixed_signable[0..4].clone_from_slice(man_prefix.as_slice());
     prefixed_signable[4..4+signable_manifest.len()].clone_from_slice(signable_manifest.clone().as_slice());
 
-    //
-    // 4. Create digest, sign it with master private key, get signature
-    //
-    let digest_a = create_sha512_half_digest(&prefixed_signable);
-    let message_a = Message::from_slice(&digest_a).unwrap();
-    let s = engine.sign_ecdsa(&message_a, &master_secret_key);
-    let master_signature = s.serialize_der();
-    let master_signature_b64 = base64::encode(master_signature);
-    let master_signature_bytes = base64::decode(master_signature_b64).expect("unable to decode a blob");
+    // 4. Sign the signable manifest with master secret key
+    let master_signature_bytes = sign_buffer(&master_secret_key, &prefixed_signable);
 
-    //
     // 5. Sign it with signing private key, get signature
-    //
-    let s = engine.sign_ecdsa(&message_a, &signing_secret_key);
-    let signature = s.serialize_der();
-    let signature_b64 = base64::encode(signature);
-    let signature_bytes = base64::decode(signature_b64).expect("unable to decode a blob");
+    let signature_bytes = sign_buffer(&signing_secret_key, &prefixed_signable);
 
-    //
     // 6. Create final manifest with sequence, public key, signing public key, master signature, signature
-    //
     let manifest = create_final_manifest(&master_public_bytes, &signing_public_bytes, &master_signature_bytes, &signature_bytes);
 
-    //
     // 7. Create Validator blob.
-    //
     let validator_blob = create_validator_blob_json(&manifest, &master_public_hex);
     let bstr = base64::encode(&validator_blob);
     let blob_bytes = base64::decode(&bstr).expect("unable to decode a blob");
     let bb = bstr.as_bytes().to_vec();
 
-    //
     // 8.  Get signature for blob using master private key
-    //
-    let blob_digest = create_sha512_half_digest(&blob_bytes);
-    println!("rust: blob_digest: {:02X?}", blob_digest);
-    let message = Message::from_slice(&blob_digest).unwrap();
-    let s = engine.sign_ecdsa(&message, &signing_secret_key);
-    let blob_signature = s.serialize_der();
-    let blob_signature_b64 = base64::encode(blob_signature);
-    let blob_signature_bytes = base64::decode(blob_signature_b64).expect("unable to decode a blob");
+    let blob_signature_bytes = sign_buffer(&signing_secret_key, &blob_bytes);
 
-    // 
     // 9. Setup payload, send it
-    //
     let mstr = base64::encode(manifest);
     let mb = mstr.as_bytes().to_vec();
     let sstr = hex::encode_upper(blob_signature_bytes);
