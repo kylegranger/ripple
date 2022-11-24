@@ -130,8 +130,6 @@ fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> 
     manifest[i+1] = 33;
     i += 2;
     manifest[i..i+33].clone_from_slice(public_key.as_slice());
-
-
     i += 33;
 
     // serialize signing public key
@@ -140,7 +138,6 @@ fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> 
     i += 2;
     manifest[i..i+33].clone_from_slice(signing_pub_key.as_slice());
     manifest
-
 }
 
 fn create_final_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master_signature: &Vec<u8>, signature: &Vec<u8>) -> Vec<u8> {
@@ -171,14 +168,12 @@ fn create_final_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master
     manifest[i..i+signature.len()].clone_from_slice(&signature.as_slice());
     i += signature.len();
 
-
     // serialize master signature
     manifest[i] = 0x70; // field code 18 for "MasterSignature"
     manifest[i+1] = 0x12;
     manifest[i+2] = master_signature.len() as u8;
     i += 3;
     manifest[i..i+master_signature.len()].clone_from_slice(&master_signature.as_slice());
-
     manifest
 
 }
@@ -243,7 +238,7 @@ async fn c026() {
     prefixed_signable[0..4].clone_from_slice(man_prefix.as_slice());
     prefixed_signable[4..4+signable_manifest.len()].clone_from_slice(signable_manifest.clone().as_slice());
 
-    // 4. Sign the signable manifest with master secret key
+    // 4. Sign the signable manifest with master secret key, get master signature
     let master_signature_bytes = sign_buffer(&master_secret_key, &prefixed_signable);
 
     // 5. Sign it with signing private key, get signature
