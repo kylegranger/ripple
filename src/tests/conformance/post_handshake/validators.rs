@@ -6,7 +6,7 @@ use sha2::{Sha512, Digest};
 
 use secp256k1::{
     constants::{PUBLIC_KEY_SIZE},
-    PublicKey, Secp256k1, SecretKey, Message
+    Secp256k1, SecretKey, Message
 };
 
 use crate::{
@@ -132,8 +132,8 @@ fn create_validator_blob_json(manifest: &Vec<u8>, pkstr: &String) -> String{
 }
 
 
-fn create_signable_manifest(publicKey: &Vec<u8>, signingPubKey: &Vec<u8>) -> Vec<u8> {
-    let size = 5 + 2 + publicKey.len() + 2 + signingPubKey.len();
+fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> Vec<u8> {
+    let size = 5 + 2 + public_key.len() + 2 + signing_pub_key.len();
     let mut manifest: Vec<u8> = vec!(0; size);
     manifest[0] = 0x24;
     manifest[4] = 0x01;
@@ -143,8 +143,7 @@ fn create_signable_manifest(publicKey: &Vec<u8>, signingPubKey: &Vec<u8>) -> Vec
     manifest[i] = 0x71; // field code for "PublicKey"
     manifest[i+1] = 33; // size
     i += 2;
-    // publicKey.copy_from_slice(&manifest[i..i+33]);
-    manifest[i..i+33].clone_from_slice(publicKey.as_slice());
+    manifest[i..i+33].clone_from_slice(public_key.as_slice());
 
 
     i += 33;
@@ -153,75 +152,34 @@ fn create_signable_manifest(publicKey: &Vec<u8>, signingPubKey: &Vec<u8>) -> Vec
     manifest[i] = 0x73; // field code for "SigningPubKey"
     manifest[i+1] = 33; // size
     i += 2;
-    manifest[i..i+33].clone_from_slice(signingPubKey.as_slice());
-    i += 33;
+    manifest[i..i+33].clone_from_slice(signing_pub_key.as_slice());
     manifest
 
 }
 
-fn create_manifest_b(publicKey: &Vec<u8>, signingPubKey: &Vec<u8>, masterSignature: &Vec<u8>) -> Vec<u8> {
-    let size = 5 + 2 + publicKey.len() + 2 + signingPubKey.len() + 3 + masterSignature.len();
+fn create_final_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master_signature: &Vec<u8>, signature: &Vec<u8>) -> Vec<u8> {
+    let size = 5 + 2 + public_key.len() + 2 + signing_pub_key.len() + 3 + master_signature.len() + 2 + signature.len();
     let mut manifest: Vec<u8> = vec!(0; size);
     manifest[0] = 0x24;
     manifest[4] = 0x01;
     let mut i = 5;
 
     // serialize public key
-    manifest[i] = 0x71; // field code for "PublicKey"
+    manifest[i] = 0x71; // field code 1 for "PublicKey"
     manifest[i+1] = 33; // size
     i += 2;
-    // publicKey.copy_from_slice(&manifest[i..i+33]);
-    manifest[i..i+33].clone_from_slice(publicKey.as_slice());
-
-
+    manifest[i..i+33].clone_from_slice(public_key.as_slice());
     i += 33;
 
     // serialize signing public key
-    manifest[i] = 0x73; // field code for "SigningPubKey"
+    manifest[i] = 0x73; // field code 3 for "SigningPubKey"
     manifest[i+1] = 33; // size
     i += 2;
-    manifest[i..i+33].clone_from_slice(signingPubKey.as_slice());
-    i += 33;
-
-    // serialize naster signature
-    //let size: u32 = u32::from(masterSignature.len());
-    manifest[i] = 0x70; // field code for "SigningPubKey"
-    manifest[i+1] = 0x12; // size
-    manifest[i+2] = masterSignature.len() as u8;
-    i += 3;
-    manifest[i..i+masterSignature.len()].clone_from_slice(&masterSignature.as_slice());
-    i += masterSignature.len();
-    manifest
-
-}
-
-
-fn create_final_manifest(publicKey: &Vec<u8>, signingPubKey: &Vec<u8>, masterSignature: &Vec<u8>, signature: &Vec<u8>) -> Vec<u8> {
-    let size = 5 + 2 + publicKey.len() + 2 + signingPubKey.len() + 3 + masterSignature.len() + 2 + signature.len();
-    let mut manifest: Vec<u8> = vec!(0; size);
-    manifest[0] = 0x24;
-    manifest[4] = 0x01;
-    let mut i = 5;
-
-    // serialize public key
-    manifest[i] = 0x71; // field code for "PublicKey"
-    manifest[i+1] = 33; // size
-    i += 2;
-    // publicKey.copy_from_slice(&manifest[i..i+33]);
-    manifest[i..i+33].clone_from_slice(publicKey.as_slice());
-
-
-    i += 33;
-
-    // serialize signing public key
-    manifest[i] = 0x73; // field code for "SigningPubKey"
-    manifest[i+1] = 33; // size
-    i += 2;
-    manifest[i..i+33].clone_from_slice(signingPubKey.as_slice());
+    manifest[i..i+33].clone_from_slice(signing_pub_key.as_slice());
     i += 33;
 
     // serialize signature
-    manifest[i] = 0x76; // field code for "SigningPubKey"
+    manifest[i] = 0x76; // field code 6 for "Signature"
     manifest[i+1] = signature.len() as u8;
     i += 2;
     manifest[i..i+signature.len()].clone_from_slice(&signature.as_slice());
@@ -229,43 +187,36 @@ fn create_final_manifest(publicKey: &Vec<u8>, signingPubKey: &Vec<u8>, masterSig
 
 
     // serialize master signature
-    manifest[i] = 0x70; // field code for "SigningPubKey"
-    manifest[i+1] = 0x12; // size
-    manifest[i+2] = masterSignature.len() as u8;
+    manifest[i] = 0x70; // field code 18 for "MasterSignature"
+    manifest[i+1] = 0x12;
+    manifest[i+2] = master_signature.len() as u8;
     i += 3;
-    manifest[i..i+masterSignature.len()].clone_from_slice(&masterSignature.as_slice());
-    i += masterSignature.len();
+    manifest[i..i+master_signature.len()].clone_from_slice(&master_signature.as_slice());
 
     manifest
 
 }
 
 
-
-
 #[tokio::test]
 async fn c026() {
 
     // Create stateful node.
-    println!("rust: here we are----------------------------------------------------------------------------");
-    // mytest();
     let target = TempDir::new().expect("unable to create TempDir");
     let mut node = Node::builder()
         .log_to_stdout(true)
         .start(target.path(), NodeType::Stateless)
         .await
-        .expect("jkl: unable to start stateful node");
+        .expect("unable to start stateful node");
 
-    println!("rust: two----------------------------------------------------------------------------");
     let mut test_config = TestConfig::default();
     test_config.synth_node_config.generate_new_keys = false;
-    let mut synth_node = SyntheticNode::new(&test_config).await;
-    println!("rust: 2a----------------------------------------------------------------------------");
+    let synth_node = SyntheticNode::new(&test_config).await;
 
     synth_node
         .connect(node.addr())
         .await
-        .expect("jkl: unable to connect");
+        .expect("unable to connect");
     // let example_manifest_payload = loop {
     //     let (_, message) = synth_node.recv_message().await;
     //     if let Payload::TmManifests(m) = message.payload {
@@ -274,7 +225,7 @@ async fn c026() {
     // };
 
     //
-    // 1. Setup keys
+    // 1. Setup keys & prefix
     // 
     let engine = Secp256k1::new();
     let master_secret_hex = String::from("8484781AE8EEB87D8A5AA38483B5CBBCCE6AD66B4185BB193DDDFAD5C1F4FC06");
@@ -282,51 +233,37 @@ async fn c026() {
     let master_secret_bytes = hex::decode(&master_secret_hex).expect("unable to decode hex");
     let master_public_bytes = hex::decode(&master_public_hex).expect("unable to decode hex");
     let master_secret_key = SecretKey::from_slice(master_secret_bytes.as_slice()).expect("unable to create secret key");
-    println!("rust: master secret key bytes is {:02X?}", master_secret_key.secret_bytes());
-    println!("rust: master public key bytes is {:02X?}", master_public_bytes);
 
     let signing_secret_hex = String::from("00F963180681C0D1D51D1128096B8FF8668AFDC41CBDED511D12D390105EFDDC");
     let signing_public_hex = String::from("03859B76317C8AA64F2D253D3547831E413F2663AE2568F7A17E85B283CC8861E4");
     let signing_secret_bytes = hex::decode(&signing_secret_hex).expect("unable to decode hex");
     let signing_public_bytes = hex::decode(&signing_public_hex).expect("unable to decode hex");
     let signing_secret_key = SecretKey::from_slice(signing_secret_bytes.as_slice()).expect("unable to create secret key");
-    println!("rust: signing secret key bytes is {:02X?}", signing_secret_key.secret_bytes());
-    println!("rust: signing public key bytes is {:02X?}", signing_public_bytes);
 
-    // setup prefix
-    let mut man_prefix: Vec<u8> = vec!(b'M', b'A', b'N', 0);
+    let man_prefix: Vec<u8> = vec!(b'M', b'A', b'N', 0);
 
 
     //
-    // 2. Create first manifest A with sequence, public key, signing public key
+    // 2. Create signable manifest with sequence, public key, signing public key (without keys!)
     //
     let signable_manifest = create_signable_manifest(&master_public_bytes, &signing_public_bytes);
-    println!("rust: manifest_a size: {}", signable_manifest.len());
-    println!("rust: manifest_a dump: {:02X?}", signable_manifest);
 
     //
     // 3. append manifest prefix
     //
-    let mut size = 4 + signable_manifest.len();
     let mut prefixed_signable: Vec<u8> = vec!(0; signable_manifest.len() + 4);
     prefixed_signable[0..4].clone_from_slice(man_prefix.as_slice());
     prefixed_signable[4..4+signable_manifest.len()].clone_from_slice(signable_manifest.clone().as_slice());
-    println!("rust: prefix_manifest_a size: {}", prefixed_signable.len());
-    println!("rust: prefix_manifest_a dump: {:02X?}", prefixed_signable);
 
     //
     // 4. Create digest, sign it with master private key, get signature
     //
     let digest_a = create_sha512_half_digest(&prefixed_signable);
-    println!("rust: digest_a: {:02X?}", digest_a);
     let message_a = Message::from_slice(&digest_a).unwrap();
     let s = engine.sign_ecdsa(&message_a, &master_secret_key);
     let master_signature = s.serialize_der();
     let master_signature_b64 = base64::encode(master_signature);
     let master_signature_bytes = base64::decode(master_signature_b64).expect("unable to decode a blob");
-    println!("rust: master_signature size: {}", master_signature_bytes.len());
-    println!("rust: master_signature: {:02X?}", master_signature_bytes);
-
 
     //
     // 5. Sign it with signing private key, get signature
@@ -335,49 +272,14 @@ async fn c026() {
     let signature = s.serialize_der();
     let signature_b64 = base64::encode(signature);
     let signature_bytes = base64::decode(signature_b64).expect("unable to decode a blob");
-    println!("rust: signature size: {}", signature_bytes.len());
-    println!("rust: signature: {:02X?}", signature_bytes);
-
-
-    // //
-    // // 5. Create manifest B with sequence, public key, signing public key, master signature
-    // //
-    // let manifest_b = create_manifest_b(&master_public_bytes, &signing_public_bytes, &master_signature_bytes);
-    // println!("rust: manifest_b size: {}", manifest_b.len());
-    // println!("rust: manifest_b dump: {:02X?}", manifest_b);
-
-    // //
-    // // 6. append manifest prefix
-    // //
-    // let mut size = 4 + manifest_b.len();
-    // let mut prefix_manifest_b: Vec<u8> = vec!(0; manifest_b.len() + 4);
-    // prefix_manifest_b[0..4].clone_from_slice(man_prefix.as_slice());
-    // prefix_manifest_b[4..4+manifest_b.len()].clone_from_slice(manifest_b.clone().as_slice());
-    // println!("rust: prefix_manifest_b size: {}", prefix_manifest_b.len());
-    // println!("rust: prefix_manifest_b dump: {:02X?}", prefix_manifest_b);
-
-    // //
-    // // 7. Create digest, sign it with signing private key, get signature
-    // //
-    // let digest_b = create_sha512_half_digest(&prefix_manifest_b);
-    // println!("rust: digest_b: {:02X?}", digest_b);
-    // let message_b = Message::from_slice(&digest_b).unwrap();
-    // let s = engine.sign_ecdsa(&message_b, &signing_secret_key);
-    // let signature = s.serialize_der();
-    // let signature_b64 = base64::encode(signature);
-    // let signature_bytes = base64::decode(signature_b64).expect("unable to decode a blob");
-    // println!("rust: rust: sig b size: {:02X?}", signature_bytes.len());
 
     //
-    // 6. Create manifest C with sequence, public key, signing public key, master signature, signature
+    // 6. Create final manifest with sequence, public key, signing public key, master signature, signature
     //
     let manifest = create_final_manifest(&master_public_bytes, &signing_public_bytes, &master_signature_bytes, &signature_bytes);
-    println!("rust: manifest size: {}", manifest.len());
-    println!("rust: manifest dump: {:02X?}", manifest);
-
 
     //
-    // A. Create Validator blob.
+    // 7. Create Validator blob.
     //
     let validator_blob = create_validator_blob_json(&manifest, &master_public_hex);
     let bstr = base64::encode(&validator_blob);
@@ -385,7 +287,7 @@ async fn c026() {
     let bb = bstr.as_bytes().to_vec();
 
     //
-    // B.  Get signature for blob using master private key
+    // 8.  Get signature for blob using master private key
     //
     let blob_digest = create_sha512_half_digest(&blob_bytes);
     println!("rust: blob_digest: {:02X?}", blob_digest);
@@ -394,16 +296,14 @@ async fn c026() {
     let blob_signature = s.serialize_der();
     let blob_signature_b64 = base64::encode(blob_signature);
     let blob_signature_bytes = base64::decode(blob_signature_b64).expect("unable to decode a blob");
-    println!("rust: sig c size: {:02X?}", blob_signature_bytes.len());
 
+    // 
+    // 9. Setup payload, send it
+    //
     let mstr = base64::encode(manifest);
     let mb = mstr.as_bytes().to_vec();
     let sstr = hex::encode_upper(blob_signature_bytes);
     let sb = sstr.as_bytes().to_vec();
-    println!("rust:-------------------about to send payload");
-    println!("rust:-------------------manifest\n{}", mstr);
-    println!("rust:-------------------blob\n{}", bstr);
-    println!("rust:-------------------signature\n{}", sstr);
 
     let payload = Payload::TmValidatorList(TmValidatorList {
         manifest: mb,
@@ -413,9 +313,9 @@ async fn c026() {
     });
     synth_node
         .unicast(node.addr(), payload)
-        .expect("jkl: unable to send message");
+        .expect("unable to send message");
 
     sleep(Duration::from_secs(300)).await;
     synth_node.shut_down().await;
-    node.stop().expect("jkl: unable to stop stateful node");
+    node.stop().expect("unable to stop stateful node");
 }
