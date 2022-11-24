@@ -43,20 +43,14 @@ struct ValidatorBlob {
 #[allow(non_snake_case)]
 async fn c015_TM_VALIDATOR_LIST_COLLECTION_node_should_send_validator_list() {
     // ZG-CONFORMANCE-015
-
     // Check for a TmValidatorListCollection message.
     let check = |m: &BinaryMessage| {
         if let Payload::TmValidatorListCollection(validator_list_collection) = &m.payload {
-            // let 
             if let Some(blob_info) = validator_list_collection.blobs.first() {
-                println!("Blob bytes: {:02X?}", blob_info.blob);
-                println!("Manifest bytes: {:02X?}", blob_info.manifest);
-                println!("Signature bytes: {:02X?}", blob_info.signature);
                 let decoded_blob =
                     base64::decode(&blob_info.blob).expect("unable to decode a blob");
                 let text = String::from_utf8(decoded_blob)
                     .expect("unable to convert decoded blob bytes to a string");
-                println!("json blob: {}", text);
                 let validator_list = serde_json::from_str::<ValidatorList>(&text)
                     .expect("unable to deserialize a validator list");
                 if validator_list.validators.is_empty() {
@@ -83,11 +77,7 @@ async fn c015_TM_VALIDATOR_LIST_COLLECTION_node_should_send_validator_list() {
     perform_expected_message_test(Default::default(), &check).await;
 }
 
-
-
-
 fn create_sha512_half_digest(buffer: &Vec<u8>) -> [u8; 32]{
-
     let mut hasher = Sha512::new();
     hasher.update(buffer);
     let result = hasher.finalize();
@@ -97,11 +87,8 @@ fn create_sha512_half_digest(buffer: &Vec<u8>) -> [u8; 32]{
     for i in 0..32 {
         signature[i] = result[i];
     }
-
     signature
 }
-
-
 
 fn _gen_keys() {
     let engine = Secp256k1::new();
@@ -131,7 +118,6 @@ fn create_validator_blob_json(manifest: &Vec<u8>, pkstr: &String) -> String{
     jstr
 }
 
-
 fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> Vec<u8> {
     let size = 5 + 2 + public_key.len() + 2 + signing_pub_key.len();
     let mut manifest: Vec<u8> = vec!(0; size);
@@ -141,7 +127,7 @@ fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> 
 
     // serialize public key
     manifest[i] = 0x71; // field code for "PublicKey"
-    manifest[i+1] = 33; // size
+    manifest[i+1] = 33;
     i += 2;
     manifest[i..i+33].clone_from_slice(public_key.as_slice());
 
@@ -150,7 +136,7 @@ fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> 
 
     // serialize signing public key
     manifest[i] = 0x73; // field code for "SigningPubKey"
-    manifest[i+1] = 33; // size
+    manifest[i+1] = 33;
     i += 2;
     manifest[i..i+33].clone_from_slice(signing_pub_key.as_slice());
     manifest
@@ -166,14 +152,14 @@ fn create_final_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master
 
     // serialize public key
     manifest[i] = 0x71; // field code 1 for "PublicKey"
-    manifest[i+1] = 33; // size
+    manifest[i+1] = 33;
     i += 2;
     manifest[i..i+33].clone_from_slice(public_key.as_slice());
     i += 33;
 
     // serialize signing public key
     manifest[i] = 0x73; // field code 3 for "SigningPubKey"
-    manifest[i+1] = 33; // size
+    manifest[i+1] = 33;
     i += 2;
     manifest[i..i+33].clone_from_slice(signing_pub_key.as_slice());
     i += 33;
