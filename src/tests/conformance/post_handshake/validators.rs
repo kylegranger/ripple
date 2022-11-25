@@ -83,7 +83,7 @@ fn create_sha512_half_digest(buffer: &Vec<u8>) -> [u8; 32]{
     hasher.update(buffer);
     let result = hasher.finalize();
 
-    // only use first 32 bytes of 64-byte result
+    // we return 32 bytes of 64-byte result
     let mut signature = [0u8; 32];
     for i in 0..32 {
         signature[i] = result[i];
@@ -146,14 +146,14 @@ fn create_signable_manifest(sequence: u32, public_key: &Vec<u8>, signing_pub_key
     let mut i = 5;
 
     // serialize public key
-    manifest[i] = 0x71; // field code for "PublicKey"
+    manifest[i] = 0x71; // field code 1 for "PublicKey"
     manifest[i+1] = PUBLIC_KEY_SIZE as u8;
     i += 2;
     manifest[i..i+PUBLIC_KEY_SIZE].clone_from_slice(public_key.as_slice());
     i += PUBLIC_KEY_SIZE;
 
     // serialize signing public key
-    manifest[i] = 0x73; // field code for "SigningPubKey"
+    manifest[i] = 0x73; // field code 3 for "SigningPubKey"
     manifest[i+1] = PUBLIC_KEY_SIZE as u8;
     i += 2;
     manifest[i..i+PUBLIC_KEY_SIZE].clone_from_slice(signing_pub_key.as_slice());
@@ -232,16 +232,10 @@ async fn c026() {
         .connect(node.addr())
         .await
         .expect("unable to connect");
-    // let example_manifest_payload = loop {
-    //     let (_, message) = synth_node.recv_message().await;
-    //     if let Payload::TmManifests(m) = message.payload {
-    //         break m;
-    //     }
-    // };
 
     // 1. Setup keys & prefix.  Both master and signing key pairs have been previously generated.
     let master_secret_hex = String::from("8484781AE8EEB87D8A5AA38483B5CBBCCE6AD66B4185BB193DDDFAD5C1F4FC06");
-    // The master public key should be in the validators.txt file, in ~/.ripple/setup
+    // The master public key should be in the validators.txt file, in ~/.ziggurat/ripple/setup
     let master_public_hex = String::from("02ED521B8124454DD5B7769C813BD40E8D36E134DD51ACED873B49E165327F6DF2");
     let master_secret_bytes = hex::decode(&master_secret_hex).expect("unable to decode hex");
     let master_public_bytes = hex::decode(&master_public_hex).expect("unable to decode hex");
