@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 use tokio::time::sleep;
 use sha2::{Sha512, Digest};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use secp256k1::{
     constants::{PUBLIC_KEY_SIZE},
@@ -111,9 +112,23 @@ fn create_validator_blob_json(manifest: &Vec<u8>, pkstr: &String) -> String{
     };
     let mut vvec: Vec<Validator> = Vec::new();
     vvec.push(v);
+
+
+    // Set expiration to 1 year from now.
+    // validator blob uses delta from Jan 1 2000,
+    // and not 1970, per Unix epoch time
+    let start = SystemTime::now();
+    let epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let now = epoch.as_secs() as u32;
+    let jan1_2000: u32 = 946684800;
+    let year: u32 = 86400*365;
+    let expiration: u32 = now + year - jan1_2000;
+
     let vblob = ValidatorBlob {
         sequence: 2022100501,
-        expiration: 733881600,
+        expiration: expiration,
         validators: vvec
     };
     let jstr = serde_json::to_string(&vblob).unwrap();
