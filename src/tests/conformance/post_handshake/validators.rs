@@ -127,16 +127,16 @@ fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> 
 
     // serialize public key
     manifest[i] = 0x71; // field code for "PublicKey"
-    manifest[i+1] = 33;
+    manifest[i+1] = PUBLIC_KEY_SIZE as u8;
     i += 2;
-    manifest[i..i+33].clone_from_slice(public_key.as_slice());
-    i += 33;
+    manifest[i..i+PUBLIC_KEY_SIZE].clone_from_slice(public_key.as_slice());
+    i += PUBLIC_KEY_SIZE;
 
     // serialize signing public key
     manifest[i] = 0x73; // field code for "SigningPubKey"
-    manifest[i+1] = 33;
+    manifest[i+1] = PUBLIC_KEY_SIZE as u8;
     i += 2;
-    manifest[i..i+33].clone_from_slice(signing_pub_key.as_slice());
+    manifest[i..i+PUBLIC_KEY_SIZE].clone_from_slice(signing_pub_key.as_slice());
     manifest
 }
 
@@ -149,17 +149,17 @@ fn create_final_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master
 
     // serialize public key
     manifest[i] = 0x71; // field code 1 for "PublicKey"
-    manifest[i+1] = 33;
+    manifest[i+1] = PUBLIC_KEY_SIZE as u8;
     i += 2;
-    manifest[i..i+33].clone_from_slice(public_key.as_slice());
-    i += 33;
+    manifest[i..i+PUBLIC_KEY_SIZE].clone_from_slice(public_key.as_slice());
+    i += PUBLIC_KEY_SIZE;
 
     // serialize signing public key
     manifest[i] = 0x73; // field code 3 for "SigningPubKey"
-    manifest[i+1] = 33;
+    manifest[i+1] = PUBLIC_KEY_SIZE as u8;
     i += 2;
-    manifest[i..i+33].clone_from_slice(signing_pub_key.as_slice());
-    i += 33;
+    manifest[i..i+PUBLIC_KEY_SIZE].clone_from_slice(signing_pub_key.as_slice());
+    i += PUBLIC_KEY_SIZE;
 
     // serialize signature
     manifest[i] = 0x76; // field code 6 for "Signature"
@@ -231,6 +231,12 @@ async fn c026() {
     let man_prefix: Vec<u8> = vec!(b'M', b'A', b'N', 0);
 
     // 2. Create signable manifest with sequence, public key, signing public key (without signatures)
+    if master_public_bytes.len() != PUBLIC_KEY_SIZE {
+        panic!("invalid master public key length: {}", master_public_bytes.len());
+    }
+    if signing_public_bytes.len() != PUBLIC_KEY_SIZE {
+        panic!("invalid signing public key length: {}", signing_public_bytes.len());
+    }
     let signable_manifest = create_signable_manifest(&master_public_bytes, &signing_public_bytes);
 
     // 3. append manifest prefix
