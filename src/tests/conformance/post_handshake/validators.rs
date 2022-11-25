@@ -90,6 +90,8 @@ fn create_sha512_half_digest(buffer: &Vec<u8>) -> [u8; 32]{
     signature
 }
 
+// run this to create a key pair.
+// use the strings to instantiate a SecretKey and PublicKey
 fn _gen_keys() {
     let engine = Secp256k1::new();
     let (private_key, public_key) = engine.generate_keypair(&mut secp256k1::rand::thread_rng());
@@ -222,8 +224,9 @@ async fn c026() {
     //     }
     // };
 
-    // 1. Setup keys & prefix
+    // 1. Setup keys & prefix.  Both master and signing key pairs have been previously generated.
     let master_secret_hex = String::from("8484781AE8EEB87D8A5AA38483B5CBBCCE6AD66B4185BB193DDDFAD5C1F4FC06");
+    // The master public key should be in the validators.txt file, in ~/.ripple/setup
     let master_public_hex = String::from("02ED521B8124454DD5B7769C813BD40E8D36E134DD51ACED873B49E165327F6DF2");
     let master_secret_bytes = hex::decode(&master_secret_hex).expect("unable to decode hex");
     let master_public_bytes = hex::decode(&master_public_hex).expect("unable to decode hex");
