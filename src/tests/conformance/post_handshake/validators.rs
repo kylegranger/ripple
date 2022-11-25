@@ -118,11 +118,14 @@ fn create_validator_blob_json(manifest: &Vec<u8>, pkstr: &String) -> String{
     jstr
 }
 
-fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> Vec<u8> {
+fn create_signable_manifest(sequence: u32, public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> Vec<u8> {
     let size = 5 + 2 + public_key.len() + 2 + signing_pub_key.len();
     let mut manifest: Vec<u8> = vec!(0; size);
     manifest[0] = 0x24;
-    manifest[4] = 0x01;
+    manifest[1] = ((sequence >> 24) & 0xff) as u8;
+    manifest[2] = ((sequence >> 16) & 0xff) as u8;
+    manifest[3] = ((sequence >>  8) & 0xff) as u8;
+    manifest[4] = (sequence & 0xff) as u8;
     let mut i = 5;
 
     // serialize public key
@@ -140,11 +143,14 @@ fn create_signable_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>) -> 
     manifest
 }
 
-fn create_final_manifest(public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master_signature: &Vec<u8>, signature: &Vec<u8>) -> Vec<u8> {
+fn create_final_manifest(sequence: u32, public_key: &Vec<u8>, signing_pub_key: &Vec<u8>, master_signature: &Vec<u8>, signature: &Vec<u8>) -> Vec<u8> {
     let size = 5 + 2 + public_key.len() + 2 + signing_pub_key.len() + 3 + master_signature.len() + 2 + signature.len();
     let mut manifest: Vec<u8> = vec!(0; size);
     manifest[0] = 0x24;
-    manifest[4] = 0x01;
+    manifest[1] = ((sequence >> 24) & 0xff) as u8;
+    manifest[2] = ((sequence >> 16) & 0xff) as u8;
+    manifest[3] = ((sequence >>  8) & 0xff) as u8;
+    manifest[4] = (sequence & 0xff) as u8;
     let mut i = 5;
 
     // serialize public key
@@ -237,7 +243,7 @@ async fn c026() {
     if signing_public_bytes.len() != PUBLIC_KEY_SIZE {
         panic!("invalid signing public key length: {}", signing_public_bytes.len());
     }
-    let signable_manifest = create_signable_manifest(&master_public_bytes, &signing_public_bytes);
+    let signable_manifest = create_signable_manifest(1, &master_public_bytes, &signing_public_bytes);
 
     // 3. append manifest prefix
     let mut prefixed_signable: Vec<u8> = vec!(0; signable_manifest.len() + 4);
@@ -251,7 +257,7 @@ async fn c026() {
     let signature_bytes = sign_buffer(&signing_secret_key, &prefixed_signable);
 
     // 6. Create final manifest with sequence, public key, signing public key, master signature, signature
-    let manifest = create_final_manifest(&master_public_bytes, &signing_public_bytes, &master_signature_bytes, &signature_bytes);
+    let manifest = create_final_manifest(1, &master_public_bytes, &signing_public_bytes, &master_signature_bytes, &signature_bytes);
 
     // 7. Create Validator blob.
     let validator_blob = create_validator_blob_json(&manifest, &master_public_hex);
